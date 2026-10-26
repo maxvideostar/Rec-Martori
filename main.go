@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-const version = "1.1.0"
+const version = "1.2.0"
 
 //go:embed web/index.html
 var indexHTML []byte
@@ -556,6 +556,10 @@ type App struct {
 	logMu    sync.Mutex
 	ffVer    string
 
+	quit      func()
+	asService bool
+	svcMsg    string
+
 	snapMu sync.Mutex
 	snaps  map[string]snapCache
 }
@@ -797,7 +801,7 @@ func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	a.mu.Unlock()
 	host, _ := os.Hostname()
 	writeJSON(w, map[string]any{"recorders": list, "ffmpeg": fv, "version": version,
-		"host": host, "now": time.Now(), "os": runtime.GOOS})
+		"host": host, "now": time.Now(), "os": runtime.GOOS, "service": a.asService})
 }
 
 func (a *App) recFromReq(w http.ResponseWriter, r *http.Request) *Recorder {
@@ -1097,6 +1101,70 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"restart_delay_sec": st.RestartDelaySec, "stall_sec": st.StallSec, "config_path": a.cfgPath})
 }
 
+// ───────────────────────────── serviciu Windows (din interfață) ─────────────────────────────
+
+func (a *App) handleService(w http.ResponseWriter, r *http.Request) {
+	installed, state := serviceState()
+	a.mu.Lock()
+	msg := a.svcMsg
+	a.mu.Unlock()
+	writeJSON(w, map[string]any{"supported": runtime.GOOS == "windows", "is_service": a.asService,
+		"installed": installed, "state": state, "admin": isAdmin(), "last_result": msg, "pid": os.Getpid()})
+}
+
+func (a *App) handleServiceInstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST", http.StatusMethodNotAllowed)
+		return
+	}
+	if runtime.GOOS != "windows" {
+		http.Error(w, "doar pe Windows", 400)
+		return
+	}
+	if a.asService {
+		http.Error(w, "Aplicația rulează deja ca serviciu", 400)
+		return
+	}
+	if installed, state := serviceState(); installed && state == "running" {
+		http.Error(w, "Serviciul RecMartori rulează deja (altă instanță)", 409)
+		return
+	}
+	// helper elevat (UAC): așteaptă să se închidă instanța asta, apoi instalează + pornește serviciul
+	args := fmt.Sprintf(`-install -helper -config "%s" -wait-pid %d`, a.cfgPath, os.Getpid())
+	if err := elevate(args); err != nil {
+		http.Error(w, "Nu am primit drepturi de Administrator (UAC refuzat?): "+err.Error(), 403)
+		return
+	}
+	a.logLine("Mut aplicația în serviciu Windows — închid instanța din consolă")
+	writeJSON(w, map[string]bool{"ok": true})
+	go func() { time.Sleep(700 * time.Millisecond); a.quit() }()
+}
+
+func (a *App) handleServiceUninstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.asService {
+		if err := selfUninstall(); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		a.logLine("Serviciu dezinstalat din interfață — mă opresc")
+		writeJSON(w, map[string]any{"ok": true, "stopping": true})
+		return
+	}
+	if installed, _ := serviceState(); !installed {
+		http.Error(w, "Serviciul nu este instalat", 400)
+		return
+	}
+	if err := elevate(fmt.Sprintf(`-uninstall -helper -config "%s"`, a.cfgPath)); err != nil {
+		http.Error(w, "Nu am primit drepturi de Administrator: "+err.Error(), 403)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "stopping": false})
+}
+
 // ───────────────────────────── main ─────────────────────────────
 
 func main() {
@@ -1104,9 +1172,15 @@ func main() {
 	cfgFlag := flag.String("config", filepath.Join(filepath.Dir(exe), "config.json"), "fișier configurare")
 	install := flag.Bool("install", false, "instalează și pornește ca serviciu Windows (ca Administrator)")
 	uninstall := flag.Bool("uninstall", false, "oprește și dezinstalează serviciul Windows (ca Administrator)")
+	waitPid := flag.Int("wait-pid", 0, "(intern) așteaptă închiderea acestui proces înainte de -install")
+	helper := flag.Bool("helper", false, "(intern) apelat din interfață, cu drepturi de Administrator")
 	flag.Parse()
 	cfgPath, _ := filepath.Abs(*cfgFlag)
 
+	if *helper && (*install || *uninstall) {
+		serviceHelper(*install, cfgPath, *waitPid)
+		return
+	}
 	if *install || *uninstall {
 		if err := serviceCmd(*install, cfgPath); err != nil {
 			fmt.Println("EROARE:", err)
@@ -1119,20 +1193,22 @@ func main() {
 		return
 	}
 	quit := make(chan struct{})
+	var once sync.Once
+	quitFn := func() { once.Do(func() { close(quit) }) }
 	go func() {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		<-sig
-		close(quit)
+		quitFn()
 	}()
-	run(cfgPath, quit)
+	run(cfgPath, quit, quitFn)
 }
 
 // run pornește aplicația și blochează până se închide quit.
-func run(cfgPathV string, quit <-chan struct{}) {
+func run(cfgPathV string, quit <-chan struct{}, quitFn func()) {
 	cfgPath := &cfgPathV
 	a := &App{cfgPath: *cfgPath, recs: map[string]*Recorder{}, sessions: map[string]time.Time{},
-		snaps: map[string]snapCache{}}
+		snaps: map[string]snapCache{}, quit: quitFn, asService: isService()}
 
 	cfg := defaultConfig()
 	if b, err := os.ReadFile(*cfgPath); err == nil {
@@ -1182,6 +1258,15 @@ func run(cfgPathV string, quit <-chan struct{}) {
 	a.logLine("Rec-Martori " + version + " pornit")
 	a.checkFFmpeg()
 	a.logLine("FFmpeg: " + a.ffVer)
+	if a.asService {
+		a.logLine("Rulează ca serviciu Windows")
+	}
+	resFile := filepath.Join(filepath.Dir(*cfgPath), "service-result.txt")
+	if b, err := os.ReadFile(resFile); err == nil {
+		a.svcMsg = strings.TrimSpace(string(b))
+		a.logLine("Serviciu: " + a.svcMsg)
+		os.Remove(resFile)
+	}
 
 	for _, r := range a.list() {
 		if r.cfg.AutoStart {
@@ -1213,6 +1298,9 @@ func run(cfgPathV string, quit <-chan struct{}) {
 	mux.HandleFunc("/api/rec/save", a.guard(a.handleSaveRec))
 	mux.HandleFunc("/api/rec/delete", a.guard(a.handleDeleteRec))
 	mux.HandleFunc("/api/settings", a.guard(a.handleSettings))
+	mux.HandleFunc("/api/service", a.guard(a.handleService))
+	mux.HandleFunc("/api/service/install", a.guard(a.handleServiceInstall))
+	mux.HandleFunc("/api/service/uninstall", a.guard(a.handleServiceUninstall))
 
 	srv := &http.Server{Addr: a.settings().Listen, Handler: mux}
 	go func() {

@@ -127,6 +127,7 @@ function render(){
  const ffbad=(S.ffmpeg||'').startsWith('EROARE');
  $('#chips').innerHTML=`<span class="chip">Înregistrează <b style="color:${rec==act&&act?'#3fb950':rec<act?'#e3b341':''}">${rec}/${R.length}</b></span>
   <span class="chip" title="${esc(S.ffmpeg)}" style="${ffbad?'color:#ff7b72;border-color:#8e1519':''}">${ffbad?'⚠ ffmpeg lipsă':esc((S.ffmpeg||'').replace('ffmpeg version ','ffmpeg '))}</span>
+  ${S.os=='windows'?`<span class="chip" style="cursor:pointer" onclick="openSettings()" title="Mod de rulare">${S.service?'🛡 <b>serviciu</b>':'🖥 consolă'}</span>`:''}
   <span class="chip">${esc(S.host)} · ${new Date(S.now).toLocaleTimeString('ro-RO')}</span>`;
  const g=$('#grid');
  if(!R.length){g.innerHTML='<div class="empty">Niciun canal. Apasă <b>＋ Canal</b>.</div>';return}
@@ -231,7 +232,7 @@ async function delRec(id){if(!confirm('Șterg canalul din aplicație? (fișierel
 
 async function openSettings(){
  const s=await api('/api/settings');
- openModal('Setări',`<form class="f" id="sf">
+ openModal('Setări',`<div id="svcBox"></div><form class="f" id="sf">
   <label class="full">Cale ffmpeg<input name="ffmpeg" value="${esc(s.ffmpeg)}"><span class="hint">${esc(S.ffmpeg)}</span></label>
   <label>Pauză înainte de repornire (sec)<input name="restart_delay_sec" type="number" min="1" value="${s.restart_delay_sec}"></label>
   <label>Watchdog: repornește dacă nu vin date (sec, 0 = oprit)<input name="stall_sec" type="number" min="0" value="${s.stall_sec}"></label>
@@ -242,6 +243,50 @@ async function openSettings(){
  $('#sf').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);
   try{await post('/api/settings',{ffmpeg:f.get('ffmpeg'),user:f.get('user'),password:f.get('password'),listen:f.get('listen'),
    restart_delay_sec:+f.get('restart_delay_sec'),stall_sec:+f.get('stall_sec')});closeModal();toast('Setări salvate');load()}catch(err){toast(err.message)}};
+ renderSvc();
+}
+
+const SVST={running:'rulează',stopped:'oprit',starting:'pornește…',stopping:'se oprește…'};
+async function renderSvc(){
+ const b=$('#svcBox');if(!b)return;
+ let v;try{v=await api('/api/service')}catch(e){return}
+ if(!v.supported){b.innerHTML='';return}
+ let st,btn='';
+ if(v.is_service){st='🛡 Aplicația rulează <b>ca serviciu Windows</b> (pornește cu Windows, fără utilizator logat).';
+  btn=`<button class="dng" onclick="svcUninstall(true)">Dezinstalează serviciul</button>`}
+ else if(v.installed){st=`🖥 Aplicația rulează în consolă. Serviciul <b>RecMartori</b> e instalat (${SVST[v.state]||v.state}).`;
+  btn=(v.state!='running'?`<button class="pri" onclick="svcInstall()">Mută în serviciu (pornește serviciul)</button>`:'')+`<button class="dng" onclick="svcUninstall(false)">Dezinstalează serviciul</button>`}
+ else{st='🖥 Aplicația rulează în <b>consolă</b> — se oprește dacă închizi fereastra sau te deloghezi.';
+  btn=`<button class="pri" onclick="svcInstall()">🛡 Instalează ca serviciu</button>`}
+ b.innerHTML=`<div style="background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px">
+  <div style="font-weight:600;margin-bottom:6px">Serviciu Windows</div><div style="font-size:13px">${st}</div>
+  ${v.last_result?`<div class="hint" style="margin-top:6px">Ultima operație: ${esc(v.last_result)}</div>`:''}
+  ${!v.is_service&&!v.admin?'<div class="hint" style="margin-top:6px">⚠ Va apărea fereastra UAC (Da/Nu) pe ecranul PC-ului unde rulează aplicația — trebuie confirmată acolo.</div>':''}
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${btn}</div></div>`;
+}
+
+function waitBack(msg){
+ openModal('Serviciu Windows',`<p>${msg}</p><p class="hint" id="wb">Aștept să revină interfața…</p>`);
+ let n=0;const t=setInterval(async()=>{n++;
+  try{const r=await fetch('/api/service',{cache:'no-store'});
+   if(r.status==401||r.ok){const v=r.ok?await r.json():null;
+    if(!v||v.is_service){clearInterval(t);location.reload();return}}}catch(e){}
+  const w=$('#wb');if(w)w.textContent='Aștept să revină interfața… '+n*2+' s';
+  if(n>45){clearInterval(t);if(w)w.innerHTML='Nu a revenit în 90 s. Verifică pe PC: <b>services.msc → Rec-Martori</b> sau <b>rec-martori.log</b>.'}
+ },2000);
+}
+
+async function svcInstall(){
+ if(!confirm('Instalez Rec-Martori ca serviciu Windows?\n\nÎnregistrările se opresc câteva secunde (fișierul curent se închide curat), apoi pornesc din serviciu.\nConfirmă fereastra UAC pe PC.'))return;
+ try{await post('/api/service/install');waitBack('Am lansat instalarea. Instanța din consolă se închide, serviciul pornește în câteva secunde.')}
+ catch(e){toast(e.message)}
+}
+async function svcUninstall(self){
+ if(!confirm(self?'Dezinstalez serviciul?\n\nATENȚIE: aplicația și TOATE înregistrările se opresc. Pentru a le reporni, lansează Rec-Martori.exe manual.':'Dezinstalez serviciul RecMartori? (confirmă UAC pe PC)'))return;
+ try{const r=await post('/api/service/uninstall');
+  if(r.stopping){closeModal();document.body.innerHTML='<div style="padding:60px;text-align:center;font:16px system-ui;color:#e6edf3">Serviciul a fost dezinstalat și aplicația s-a oprit.<br><br>Pornește din nou <b>Rec-Martori.exe</b> pe PC.</div>'}
+  else{toast('Dezinstalare lansată');setTimeout(renderSvc,4000)}}
+ catch(e){toast(e.message)}
 }
 
 load();setInterval(load,2000);

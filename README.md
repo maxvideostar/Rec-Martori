@@ -20,14 +20,15 @@ un singur `.exe`, fără dependențe (doar `ffmpeg.exe`).
 ## Instalare (Windows)
 1. Descarcă `Rec-Martori.exe` din **Actions → artifacts** (sau compilează: `go build -o Rec-Martori.exe .`)
 2. Pune-l într-un folder fix, ex. `C:\Rec-Martori\`, împreună cu `install-service.bat` și `uninstall-service.bat`
-3. Dublu-click pe **`install-service.bat`** (cere drepturi de Administrator) → serviciul **RecMartori** e instalat și pornit
+3. Pornește `Rec-Martori.exe`, deschide interfața → **⚙ Setări → 🛡 Instalează ca serviciu** (confirmă UAC pe PC)
+   — sau dublu-click pe **`install-service.bat`** (cere drepturi de Administrator) → serviciul **RecMartori** e instalat și pornit
 4. Deschide **http://localhost:8090** (implicit `admin` / `admin` — schimbă parola din ⚙ Setări)
 
 Serviciul:
 - pornește automat cu Windows, **fără să fie nevoie de utilizator logat**
 - dacă procesul cade, Windows îl repornește după 10 s
 - la Stop / restart Windows închide curat înregistrările (MP4 valid)
-- se vede în `services.msc` ca **Rec-Martori**; dezinstalare: `uninstall-service.bat`
+- se vede în `services.msc` ca **Rec-Martori**; dezinstalare: din ⚙ Setări sau `uninstall-service.bat`
 
 Manual, din CMD ca Administrator:
 ```
