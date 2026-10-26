@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rec-Martori</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--card2:#1c2230;--line:#30363d;--txt:#e6edf3;--mut:#8b949e;
+--rec:#e5484d;--ok:#3fb950;--warn:#d29922;--off:#6e7681;--blue:#58a6ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:rgba(13,17,23,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{max-width:1500px;margin:auto;padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-right:auto}
+.brand .dot{width:12px;height:12px;border-radius:50%;background:var(--rec);box-shadow:0 0 10px var(--rec);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--mut)}
+.chip b{color:var(--txt)}
+button,.btn{background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+button:hover,.btn:hover{border-color:var(--blue)}
+button.pri{background:#238636;border-color:#2ea043}
+button.dng{background:#3d1517;border-color:#8e1519;color:#ffb3b3}
+button.sm{padding:4px 9px;font-size:12px}
+button:disabled{opacity:.5;cursor:wait}
+main{max-width:1500px;margin:auto;padding:16px;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(440px,1fr))}
+@media(max-width:520px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.card.recording{border-color:#5a1e21;box-shadow:0 0 0 1px #5a1e21 inset}
+.top{display:flex;gap:12px;padding:14px 14px 10px;align-items:flex-start}
+.snap{width:168px;aspect-ratio:16/9;flex:none;background:#000;border-radius:8px;overflow:hidden;position:relative;cursor:pointer;border:1px solid var(--line)}
+.snap img{width:100%;height:100%;object-fit:cover;display:block}
+.snap span{position:absolute;inset:0;display:grid;place-items:center;color:var(--mut);font-size:12px;text-align:center;padding:6px}
+.ttl{flex:1;min-width:0}
+.ttl h2{margin:0;font-size:17px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.src{color:var(--mut);font-size:12px;word-break:break-all;margin-top:2px}
+.badge{font-size:11px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:6px;text-transform:uppercase;display:inline-flex;gap:6px;align-items:center}
+.badge i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.b-recording{background:#3d1517;color:#ff6b6b}.b-recording i{animation:pulse 1s infinite}
+.b-starting{background:#3a2d0b;color:#e3b341}.b-waiting{background:#3a2d0b;color:#e3b341}
+.b-stopped{background:#21262d;color:#8b949e}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stats div{background:var(--card);padding:8px 10px}
+.stats small{display:block;color:var(--mut);font-size:11px}
+.stats b{font-size:14px;font-variant-numeric:tabular-nums;word-break:break-all}
+.body{padding:10px 14px;display:grid;gap:8px;font-size:13px}
+.row{display:flex;gap:8px;align-items:center}
+.row .k{color:var(--mut);min-width:96px}
+.cur{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all}
+.disk{height:6px;background:#21262d;border-radius:4px;overflow:hidden;flex:1}
+.disk div{height:100%;background:var(--blue)}
+.disk.low div{background:var(--rec)}
+.err{background:#2a1215;border:1px solid #5a1e21;color:#ffb3b3;border-radius:8px;padding:6px 10px;font-size:12px;word-break:break-word}
+.ev{list-style:none;margin:0;padding:0;font-size:12px;max-height:96px;overflow:auto}
+.ev li{display:flex;gap:8px;padding:2px 0;color:var(--mut)}
+.ev li time{font-variant-numeric:tabular-nums;flex:none}
+.ev li.warn span{color:#e3b341}.ev li.err span{color:#ff7b72}
+.act{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px 14px;margin-top:auto}
+.empty{grid-column:1/-1;text-align:center;color:var(--mut);padding:60px}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:20;padding:12px}
+.ov.on{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:14px;width:min(980px,100%);max-height:92vh;display:flex;flex-direction:column}
+.modal header{position:static;background:none;display:flex;align-items:center;padding:12px 16px;gap:10px}
+.modal header h3{margin:0;font-size:16px;margin-right:auto}
+.mb{padding:16px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--mut);font-weight:500;font-size:12px}
+td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.cur td{color:#ff8b8b}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all;max-height:55vh;overflow:auto;margin:0}
+form.f{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+form.f label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
+form.f label.full{grid-column:1/-1}
+form.f input,form.f select{padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:#0d1117;color:var(--txt);font-size:14px}
+form.f .chk{flex-direction:row;align-items:center;gap:8px;color:var(--txt)}
+.hint{font-size:11px;color:var(--mut)}
+video{width:100%;max-height:70vh;background:#000;border-radius:8px}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button.on{border-color:var(--blue);color:var(--blue)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#21262d;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:30;display:none}
+@media(max-width:600px){.top{flex-direction:column}.snap{width:100%}.stats{grid-template-columns:repeat(2,1fr)}form.f{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <div class="brand"><span class="dot"></span>Rec-Martori</div>
+  <div class="chips" id="chips"></div>
+  <button class="pri" onclick="act('startall')">▶ Pornește tot</button>
+  <button class="dng" onclick="if(confirm('Opresc TOATE înregistrările?'))act('stopall')">■ Oprește tot</button>
+  <button onclick="editRec()">＋ Canal</button>
+  <button onclick="openSettings()">⚙ Setări</button>
+  <a class="btn" href="/logout">Ieșire</a>
+</div></header>
+
+<main id="grid"></main>
+
+<div class="ov" id="ov" onclick="if(event.target===this)closeModal()"><div class="modal">
+  <header><h3 id="mt"></h3><span id="mx"></span><button onclick="closeModal()">✕</button></header>
+  <div class="mb" id="mb"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S={recorders:[]}, modalTimer=null, snapOn={};
+const STATE={recording:'Înregistrează',starting:'Conectare…',waiting:'Reîncerc…',stopped:'Oprit'};
+
+async function api(u,o){const r=await fetch(u,o);if(r.status==401){location='/login';throw new Error('auth')}
+ if(!r.ok)throw new Error(await r.text());const ct=r.headers.get('content-type')||'';return ct.includes('json')?r.json():r.text()}
+const post=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3500)}
+function fb(n){if(!n)return'0 B';const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<4){n/=1024;i++}return n.toFixed(i>2?2:i?1:0)+' '+u[i]}
+function fd(s){s=Math.floor(s||0);const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60;
+ return (d?d+'z ':'')+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0')}
+const ft=t=>new Date(t).toLocaleString('ro-RO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function fromName(n){const m=n.match(/_(\d{4})-(\d\d)-(\d\d)_(\d\d)-(\d\d)-(\d\d)\./);return m?`${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}:${m[6]}`:''}
+
+async function act(a,id){try{document.body.style.cursor='wait';await post('/api/'+a+(id?'?id='+encodeURIComponent(id):''));await load()}
+ catch(e){toast('Eroare: '+e.message)}finally{document.body.style.cursor=''}}
+
+async function load(){try{S=await api('/api/status');render()}catch(e){if(e.message!='auth')$('#chips').innerHTML='<span class="chip" style="color:#ff7b72">Server indisponibil</span>'}}
+
+function render(){
+ const R=S.recorders, rec=R.filter(r=>r.state=='recording').length, act=R.filter(r=>r.state!='stopped').length;
+ const ffbad=(S.ffmpeg||'').startsWith('EROARE');
+ $('#chips').innerHTML=`<span class="chip">Înregistrează <b style="color:${rec==act&&act?'#3fb950':rec<act?'#e3b341':''}">${rec}/${R.length}</b></span>
+  <span class="chip" title="${esc(S.ffmpeg)}" style="${ffbad?'color:#ff7b72;border-color:#8e1519':''}">${ffbad?'⚠ ffmpeg lipsă':esc((S.ffmpeg||'').replace('ffmpeg version ','ffmpeg '))}</span>
+  <span class="chip">${esc(S.host)} · ${new Date(S.now).toLocaleTimeString('ro-RO')}</span>`;
+ const g=$('#grid');
+ if(!R.length){g.innerHTML='<div class="empty">Niciun canal. Apasă <b>＋ Canal</b>.</div>';return}
+ [...g.children].forEach(c=>{if(!R.find(r=>'c_'+r.id==c.id))c.remove()});
+ R.forEach((r,i)=>{
+  let c=document.getElementById('c_'+r.id);
+  if(!c){c=document.createElement('div');c.id='c_'+r.id;c.className='card';
+   c.innerHTML=`<div class="top"><div class="snap" title="Click pentru snapshot nou" onclick="snap('${r.id}',1)"><span>Click pentru<br>imagine live</span></div><div class="ttl"></div></div><div class="stats"></div><div class="body"></div><div class="act"></div>`;
+   g.appendChild(c)}
+  if(g.children[i]!==c)g.insertBefore(c,g.children[i]);
+  c.className='card '+r.state;
+  const used=r.disk_total?1-r.disk_free/r.disk_total:0, low=r.disk_total&&r.disk_free/r.disk_total<.08;
+  const stale=r.state=='recording'&&r.idle_sec>8;
+  c.querySelector('.ttl').innerHTML=`<h2>${esc(r.name)} <span class="badge b-${r.state}"><i></i>${STATE[r.state]||r.state}</span>
+   ${r.autostart?'<span class="chip" title="Pornește automat la lansarea aplicației">auto</span>':''}</h2>
+   <div class="src">${esc(r.input)}</div>
+   <div class="src">📁 ${esc(r.out_dir)} · segment ${Math.round(r.segment_sec/60)} min · ${r.container.toUpperCase()}${r.retention_days?' · păstrez '+r.retention_days+' zile':''}</div>`;
+  c.querySelector('.stats').innerHTML=`
+   <div><small>Uptime sesiune</small><b>${r.session?fd(r.session):'—'}</b></div>
+   <div><small>Bitrate</small><b style="${stale?'color:#e3b341':''}">${esc(r.bitrate||'—')}</b></div>
+   <div><small>Viteză / FPS</small><b>${esc(r.speed||'—')}${r.fps&&r.fps!='0.0'?' · '+esc(r.fps):''}</b></div>
+   <div><small>Reporniri</small><b style="${r.restarts?'color:#e3b341':''}">${r.restarts}</b></div>`;
+  let h=`<div class="row"><span class="k">Fișier curent</span><span class="cur">${r.cur_file?'● '+esc(r.cur_file)+(r.prog_time?' <span style="color:var(--mut)">('+esc(r.prog_time.split('.')[0])+')</span>':''):'—'}</span></div>
+   <div class="row"><span class="k">Arhivă</span><span>${r.file_count} fișiere · ${fb(r.file_bytes)}</span></div>
+   <div class="row"><span class="k">Disc liber</span><div class="disk ${low?'low':''}"><div style="width:${(used*100).toFixed(1)}%"></div></div><span>${r.disk_total?fb(r.disk_free)+' / '+fb(r.disk_total):'—'}</span></div>`;
+  if(stale)h+=`<div class="err">Fără date noi de ${Math.round(r.idle_sec)} s…</div>`;
+  if(r.state=='waiting'&&r.last_err)h+=`<div class="err">${esc(r.last_err)}</div>`;
+  if(r.events.length)h+=`<ul class="ev">${r.events.slice().reverse().map(e=>`<li class="${e.level}"><time>${ft(e.t)}</time><span>${esc(e.msg)}</span></li>`).join('')}</ul>`;
+  c.querySelector('.body').innerHTML=h;
+  const on=r.state!='stopped';
+  c.querySelector('.act').innerHTML=(on?`<button class="dng sm" onclick="if(confirm('Opresc înregistrarea?'))act('stop','${r.id}')">■ Stop</button><button class="sm" onclick="act('restart','${r.id}')">↻ Restart</button>`
+   :`<button class="pri sm" onclick="act('start','${r.id}')">▶ Start</button>`)+
+   `<button class="sm" onclick="files('${r.id}')">📂 Fișiere</button><button class="sm" onclick="logs('${r.id}')">📜 Loguri</button><button class="sm" onclick="editRec('${r.id}')">✎ Editează</button>`;
+  if(on&&!snapOn[r.id]){snapOn[r.id]=1;snap(r.id)}
+ });
+}
+
+async function snap(id,force){
+ const box=document.querySelector('#c_'+id+' .snap');if(!box)return;
+ const old=box.querySelector('span');if(old)old.textContent='Se încarcă…';
+ try{const r=await fetch('/api/snap?id='+encodeURIComponent(id)+(force?'&force=1':'')+'&_='+Date.now());
+  if(!r.ok)throw new Error(await r.text());const u=URL.createObjectURL(await r.blob());
+  box.innerHTML=`<img src="${u}" alt="">`;}
+ catch(e){box.innerHTML=`<span>${esc(e.message.replace('snapshot eșuat: ','').slice(0,120))}</span>`}
+}
+setInterval(()=>{S.recorders.filter(r=>r.state=='recording').forEach(r=>snap(r.id))},60000);
+
+function openModal(t,html,extra){$('#mt').textContent=t;$('#mb').innerHTML=html;$('#mx').innerHTML=extra||'';$('#ov').classList.add('on')}
+function closeModal(){$('#ov').classList.remove('on');clearInterval(modalTimer);$('#mb').innerHTML=''}
+document.addEventListener('keydown',e=>{if(e.key=='Escape')closeModal()});
+
+async function files(id){
+ const r=S.recorders.find(x=>x.id==id);
+ openModal('Fișiere — '+r.name,'Se încarcă…',`<button class="sm" onclick="files('${id}')">↻</button>`);
+ try{const F=await api('/api/files?id='+encodeURIComponent(id));
+  const tot=F.reduce((a,f)=>a+f.size,0);
+  if(!F.length){$('#mb').innerHTML='<p style="color:var(--mut)">Niciun fișier încă în '+esc(r.out_dir)+'</p>';return}
+  $('#mb').innerHTML=`<p style="margin-top:0;color:var(--mut)">${F.length} fișiere · ${fb(tot)} · ${esc(r.out_dir)}</p><div id="player"></div>
+  <table><tr><th>Fișier</th><th>Început</th><th>Ultima scriere</th><th>Mărime</th><th></th></tr>
+  ${F.map(f=>{const q='id='+encodeURIComponent(id)+'&name='+encodeURIComponent(f.name);
+   return `<tr class="${f.current?'cur':''}"><td>${f.current?'● ':''}${esc(f.name)}</td><td class="n">${fromName(f.name)}</td><td class="n">${ft(f.mtime)}</td><td class="n">${fb(f.size)}</td>
+   <td class="n">${f.current?'<span class="hint">în înregistrare</span>':`<button class="sm" onclick="play('${q}','${esc(f.name)}')">▶</button> <a class="btn sm" style="padding:4px 9px" href="/api/file?${q}&dl=1">⬇</a> <button class="sm dng" onclick="delFile('${id}','${q}','${esc(f.name)}')">🗑</button>`}</td></tr>`}).join('')}</table>`;
+ }catch(e){$('#mb').innerHTML='<div class="err">'+esc(e.message)+'</div>'}
+}
+function play(q,n){$('#player').innerHTML=`<p style="margin:0 0 6px"><b>${n}</b></p><video controls autoplay src="/api/file?${q}"></video><p class="hint">Dacă browserul nu redă codecul, descarcă fișierul (⬇) și deschide-l în VLC.</p>`;$('#player').scrollIntoView()}
+async function delFile(id,q,n){if(!confirm('Șterg definitiv '+n+'?'))return;try{await post('/api/file/delete?'+q);toast('Șters');files(id)}catch(e){toast(e.message)}}
+
+async function logs(id){
+ const r=S.recorders.find(x=>x.id==id);let tab='log';
+ const draw=async()=>{try{const L=await api('/api/logs?id='+encodeURIComponent(id));
+   const pre=$('#lg');const atBottom=!pre||pre.scrollTop+pre.clientHeight>=pre.scrollHeight-20;
+   $('#mb').innerHTML=`<div class="tabs"><button class="${tab=='log'?'on':''}" onclick="window._lt('log')">Ieșire ffmpeg</button><button class="${tab=='ev'?'on':''}" onclick="window._lt('ev')">Istoric evenimente</button><button class="${tab=='cmd'?'on':''}" onclick="window._lt('cmd')">Comandă</button></div>`+
+   (tab=='log'?`<pre id="lg">${esc(L.logs.join('\n'))||'(gol)'}</pre>`:tab=='ev'?`<pre id="lg">${esc(L.events.slice().reverse().map(e=>ft(e.t)+'  '+e.level.toUpperCase().padEnd(5)+' '+e.msg).join('\n'))||'(gol)'}</pre>`:`<pre id="lg">${esc(L.cmd)}</pre>`);
+   const p=$('#lg');if(tab=='log'&&atBottom)p.scrollTop=p.scrollHeight}catch(e){}};
+ window._lt=t=>{tab=t;draw()};
+ openModal('Loguri — '+r.name,'Se încarcă…');draw();modalTimer=setInterval(draw,2000);
+}
+
+function editRec(id){
+ const r=id?S.recorders.find(x=>x.id==id):{name:'',input:'rtmp://',out_dir:'D:\\Martor_',prefix:'',segment_sec:7200,container:'mp4',retention_days:0,autostart:true};
+ openModal(id?'Editează — '+r.name:'Canal nou',`<form class="f" id="rf">
+  <label>Nume canal<input name="name" value="${esc(r.name)}" required></label>
+  <label>Prefix fișiere<input name="prefix" value="${esc(r.prefix)}" placeholder="Martor_Canal"><span class="hint">ex: Martor_M9Tv → Martor_M9Tv_2026-10-26_20-00-00.mp4</span></label>
+  <label class="full">Sursă (rtmp / http / udp / srt)<input name="input" value="${esc(r.input)}" required></label>
+  <label class="full">Folder destinație<input name="out_dir" value="${esc(r.out_dir)}" required></label>
+  <label>Durată segment (minute)<input name="seg" type="number" min="1" value="${Math.round(r.segment_sec/60)}"><span class="hint">tăiat la ora fixă (atclocktime)</span></label>
+  <label>Format<select name="container">${['mp4','mkv','ts'].map(x=>`<option ${r.container==x?'selected':''}>${x}</option>`).join('')}</select><span class="hint">TS/MKV rămân redabile și dacă PC-ul pică brusc</span></label>
+  <label>Păstrează (zile, 0 = nelimitat)<input name="retention_days" type="number" min="0" value="${r.retention_days||0}"><span class="hint">fișierele mai vechi se șterg automat</span></label>
+  <label class="chk"><input type="checkbox" name="autostart" ${r.autostart?'checked':''}> Pornește automat la lansare</label>
+  <div class="full" style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+   ${id?`<button type="button" class="dng" onclick="delRec('${id}')" style="margin-right:auto">🗑 Șterge canal</button>`:''}
+   <button type="button" onclick="closeModal()">Anulează</button><button class="pri">Salvează</button></div></form>`);
+ $('#rf').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);
+  const b={id:id||'',name:f.get('name'),prefix:f.get('prefix'),input:f.get('input'),out_dir:f.get('out_dir'),
+   segment_sec:Math.max(1,+f.get('seg'))*60,container:f.get('container'),retention_days:+f.get('retention_days')||0,autostart:!!f.get('autostart')};
+  try{const res=await post('/api/rec/save',b);closeModal();await load();
+   if(res.restart_needed&&confirm('Canalul înregistrează acum. Repornesc ca să aplic modificările?'))act('restart',res.id);else toast('Salvat')}
+  catch(err){toast(err.message)}};
+}
+async function delRec(id){if(!confirm('Șterg canalul din aplicație? (fișierele de pe disc rămân)'))return;
+ try{await post('/api/rec/delete?id='+encodeURIComponent(id));closeModal();load()}catch(e){toast(e.message)}}
+
+async function openSettings(){
+ const s=await api('/api/settings');
+ openModal('Setări',`<form class="f" id="sf">
+  <label class="full">Cale ffmpeg<input name="ffmpeg" value="${esc(s.ffmpeg)}"><span class="hint">${esc(S.ffmpeg)}</span></label>
+  <label>Pauză înainte de repornire (sec)<input name="restart_delay_sec" type="number" min="1" value="${s.restart_delay_sec}"></label>
+  <label>Watchdog: repornește dacă nu vin date (sec, 0 = oprit)<input name="stall_sec" type="number" min="0" value="${s.stall_sec}"></label>
+  <label>Utilizator<input name="user" value="${esc(s.user)}"></label>
+  <label>Parolă nouă<input name="password" type="password" placeholder="(neschimbată)" autocomplete="new-password"></label>
+  <label class="full">Adresă ascultare<input name="listen" value="${esc(s.listen)}"><span class="hint">ex: :8090 — necesită repornirea aplicației · config: ${esc(s.config_path)}</span></label>
+  <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button type="button" onclick="closeModal()">Anulează</button><button class="pri">Salvează</button></div></form>`);
+ $('#sf').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);
+  try{await post('/api/settings',{ffmpeg:f.get('ffmpeg'),user:f.get('user'),password:f.get('password'),listen:f.get('listen'),
+   restart_delay_sec:+f.get('restart_delay_sec'),stall_sec:+f.get('stall_sec')});closeModal();toast('Setări salvate');load()}catch(err){toast(err.message)}};
+}
+
+load();setInterval(load,2000);
+</script>
+</body>
+</html>

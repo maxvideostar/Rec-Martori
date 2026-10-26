@@ -1,0 +1,22 @@
+{
+  "listen": ":8090",
+  "user": "admin",
+  "password": "admin",
+  "ffmpeg": "C:\\Users\\produ\\Documents\\ffmpeg\\bin\\ffmpeg.exe",
+  "restart_delay_sec": 10,
+  "stall_sec": 60,
+  "recorders": [
+    {
+      "id": "m9tv", "name": "M9TV",
+      "input": "rtmp://localhost/live/m9tv",
+      "out_dir": "D:\\Martor", "prefix": "Martor_M9Tv",
+      "segment_sec": 7200, "container": "mp4", "retention_days": 0, "autostart": true
+    },
+    {
+      "id": "m9plus", "name": "M9 Plus",
+      "input": "rtmp://s2.netstreaming.eu/live/m9plus",
+      "out_dir": "D:\\Martor_M9_Plus", "prefix": "Martor_M9_Plus",
+      "segment_sec": 7200, "container": "mp4", "retention_days": 0, "autostart": true
+    }
+  ]
+}
