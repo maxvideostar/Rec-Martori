@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-const version = "1.0.0"
+const version = "1.1.0"
 
 //go:embed web/index.html
 var indexHTML []byte
@@ -1101,10 +1101,36 @@ func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	exe, _ := os.Executable()
-	baseDir := filepath.Dir(exe)
-	cfgPath := flag.String("config", filepath.Join(baseDir, "config.json"), "fișier configurare")
+	cfgFlag := flag.String("config", filepath.Join(filepath.Dir(exe), "config.json"), "fișier configurare")
+	install := flag.Bool("install", false, "instalează și pornește ca serviciu Windows (ca Administrator)")
+	uninstall := flag.Bool("uninstall", false, "oprește și dezinstalează serviciul Windows (ca Administrator)")
 	flag.Parse()
+	cfgPath, _ := filepath.Abs(*cfgFlag)
 
+	if *install || *uninstall {
+		if err := serviceCmd(*install, cfgPath); err != nil {
+			fmt.Println("EROARE:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if isService() {
+		runAsService(cfgPath)
+		return
+	}
+	quit := make(chan struct{})
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+		<-sig
+		close(quit)
+	}()
+	run(cfgPath, quit)
+}
+
+// run pornește aplicația și blochează până se închide quit.
+func run(cfgPathV string, quit <-chan struct{}) {
+	cfgPath := &cfgPathV
 	a := &App{cfgPath: *cfgPath, recs: map[string]*Recorder{}, sessions: map[string]time.Time{},
 		snaps: map[string]snapCache{}}
 
@@ -1196,9 +1222,7 @@ func main() {
 		}
 	}()
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	<-sig
+	<-quit
 	a.logLine("Oprire... închid înregistrările curat")
 	var wg sync.WaitGroup
 	for _, r := range a.list() {

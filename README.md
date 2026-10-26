@@ -18,13 +18,29 @@ un singur `.exe`, fără dependențe (doar `ffmpeg.exe`).
 - Jurnal permanent în `rec-martori.log`
 
 ## Instalare (Windows)
-1. Descarcă `Rec-Martori.exe` din **Releases** / **Actions → artifacts** (sau compilează: `go build -o Rec-Martori.exe .`)
-2. Pune-l într-un folder, ex. `C:\Rec-Martori\`, împreună cu `start.bat` și `install-autostart.bat`
-3. Pornește `start.bat` → deschide **http://localhost:8090** (implicit `admin` / `admin` — schimbă parola din ⚙ Setări)
-4. Opțional: `install-autostart.bat` ca Administrator → pornește singur la logare
+1. Descarcă `Rec-Martori.exe` din **Actions → artifacts** (sau compilează: `go build -o Rec-Martori.exe .`)
+2. Pune-l într-un folder fix, ex. `C:\Rec-Martori\`, împreună cu `install-service.bat` și `uninstall-service.bat`
+3. Dublu-click pe **`install-service.bat`** (cere drepturi de Administrator) → serviciul **RecMartori** e instalat și pornit
+4. Deschide **http://localhost:8090** (implicit `admin` / `admin` — schimbă parola din ⚙ Setări)
+
+Serviciul:
+- pornește automat cu Windows, **fără să fie nevoie de utilizator logat**
+- dacă procesul cade, Windows îl repornește după 10 s
+- la Stop / restart Windows închide curat înregistrările (MP4 valid)
+- se vede în `services.msc` ca **Rec-Martori**; dezinstalare: `uninstall-service.bat`
+
+Manual, din CMD ca Administrator:
+```
+Rec-Martori.exe -install -config C:\Rec-Martori\config.json
+Rec-Martori.exe -uninstall
+sc stop RecMartori  /  sc start RecMartori
+```
+Fără serviciu (test): `start.bat` sau dublu-click pe exe.
 
 La prima pornire se creează `config.json` cu cele două canale (M9TV, M9 Plus). Calea ffmpeg implicită:
 `C:\Users\produ\Documents\ffmpeg\bin\ffmpeg.exe` (modificabilă din Setări).
+Serviciul rulează ca *LocalSystem*: are acces la discuri locale (D:\), dar **nu** la unități de rețea mapate
+(pentru NAS folosește cale UNC `\\server\share\...` și dă drept de scriere contului calculatorului).
 
 Firewall, dacă vrei acces din rețea:
 ```
@@ -39,7 +55,7 @@ ffmpeg -hide_banner -rw_timeout 15000000 -i <sursă> -c:v copy -c:a copy -f segm
 ```
 
 ## Opțiuni linie de comandă
-`Rec-Martori.exe -config D:\alt\config.json`
+`-config <cale>` · `-install` · `-uninstall`
 
 ## Linux
 `go build -o rec-martori . && ./rec-martori` (folosește `ffmpeg` din PATH).
